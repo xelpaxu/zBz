@@ -34,7 +34,7 @@ const COMMUNITY_DATA: CommunityReport[] = [
   {
     id: "1",
     image: require("../../assets/images/sample-site.webp"),
-    userName: "John Doe",
+    userName: "John Doesena",
     location: "Calumpang, Iloilo City",
     timestamp: "1d ago",
     status: "CRITICAL",
