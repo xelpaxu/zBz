@@ -18,7 +18,6 @@ export default function TabLayout() {
         header: ({ options }) => (
           <View style={styles.headerWrapper}>
             <View style={styles.headerMainRow}>
-              {/* Left: Profile Avatar */}
               <View style={styles.headerSideSection}>
                 <TouchableOpacity style={styles.avatarCircle}>
                   <Image
@@ -28,32 +27,24 @@ export default function TabLayout() {
                 </TouchableOpacity>
               </View>
 
-              {/* Center: Title with Manrope Font */}
               <Text style={styles.headerTitle}>{options.title}</Text>
 
-              {/* Right: Actions */}
               <View style={[styles.headerActions, styles.headerSideSection]}>
                 <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons
-                    name="notifications-outline"
-                    size={24}
-                    color="black"
-                  />
+                  <Ionicons name="notifications" size={24} color="#4F46E5" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons name="settings-outline" size={24} color="black" />
+                  <Ionicons name="settings" size={24} color="#4F46E5" />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Full width line */}
             <View style={styles.headerLine} />
           </View>
         ),
 
         tabBarActiveTintColor: "#4F46E5",
         tabBarInactiveTintColor: "#484C52",
-        // Inter Font for Tab Labels
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
           fontSize: 12,
@@ -62,7 +53,6 @@ export default function TabLayout() {
           position: "absolute",
           bottom: 25,
           left: "50%",
-          // Correct centering: -(345 / 2)
           transform: [{ translateX: 35 }],
           width: 345,
           height: 75,
@@ -128,10 +118,10 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
   },
   headerSideSection: {
-    width: 80, // Fixed width for left/right to keep center title stable
+    width: 80,
   },
   headerTitle: {
-    flex: 1, // Takes up remaining space
+    flex: 1,
     fontSize: 20,
     fontFamily: "Manrope_700Bold",
     color: "#000000",
