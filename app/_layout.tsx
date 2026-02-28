@@ -1,8 +1,16 @@
+import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import { Inter_400Regular, Inter_500Medium } from "@expo-google-fonts/inter";
 import { Manrope_700Bold, useFonts } from "@expo-google-fonts/manrope";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { tokenCache } from "../lib/cache";
+
+const PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env");
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -19,9 +27,17 @@ export default function RootLayout() {
     }
   }, [loaded, error]);
 
-  if (!loaded && !error) {
-    return null;
-  }
+  if (!loaded && !error) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <ClerkProvider tokenCache={tokenCache} publishableKey={PUBLISHABLE_KEY}>
+      <ClerkLoaded>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)/login" options={{ title: "Login" }} />
+          <Stack.Screen name="(auth)/signup" options={{ title: "Sign Up" }} />
+          <Stack.Screen name="(root)/index" options={{ title: "Home" }} />
+        </Stack>
+      </ClerkLoaded>
+    </ClerkProvider>
+  );
 }
