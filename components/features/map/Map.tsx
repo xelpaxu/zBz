@@ -1,54 +1,82 @@
 import Slider from '@react-native-community/slider';
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
-import MapView, { Circle, Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
+import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from "react-native";
 
-const INITIAL_LOCATION: Region = {
+// Import react-native-maps components with require to avoid Web crash
+let MapView: any, Circle: any, Marker: any, PROVIDER_DEFAULT: any;
+if (Platform.OS !== 'web') {
+  const Maps = require('react-native-maps');
+  MapView = Maps.default;
+  Circle = Maps.Circle;
+  Marker = Maps.Marker;
+  PROVIDER_DEFAULT = Maps.PROVIDER_DEFAULT;
+}
+
+const INITIAL_LOCATION = {
   latitude: 10.6840,
   longitude: 122.5130,
-  latitudeDelta: 0.03, // Slightly wider to see the whole district
+  latitudeDelta: 0.03,
   longitudeDelta: 0.03,
 };
 
+// --- UI DEVELOPMENT MOCK DATA ---
+const MOCK_DATA = {
+  hotspots: [
+    { id: '1', lat: 10.6840, lng: 122.5130, radius: 300 },
+    { id: '2', lat: 10.6900, lng: 122.5200, radius: 200 },
+  ],
+  agents: [
+    { id: 'a1', lat: 10.6845, lng: 122.5135 },
+    { id: 'a2', lat: 10.6830, lng: 122.5120 },
+    { id: 'a3', lat: 10.6860, lng: 122.5150 },
+  ]
+};
+
 export default function UserLocationMap() {
-  const [simulationData, setSimulationData] = useState<{ hotspots: any[], agents: any[] }>({
-    hotspots: [],
-    agents: []
-  });
+  // Initializing with MOCK_DATA for UI testing
+  const [simulationData, setSimulationData] = useState(MOCK_DATA);
   const [loading, setLoading] = useState(false);
   const [timeStep, setTimeStep] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchSimulationData = async (step: number) => {
+    /* --- MODEL/API LOGIC COMMENTED OUT FOR UI DEV ---
     setLoading(true);
     try {
       const url = `http://192.168.1.39:8000/api/v1/simulation?step=${step}`;
       const response = await fetch(url);
       const data = await response.json();
-
-      console.log(`Fetched Step ${step}:`, {
-        hotspots: data?.hotspots?.length,
-        agents: data?.agents?.length
-      });
-
       setSimulationData(data);
     } catch (error) {
-      console.error("Connection Error! Verify Backend is running and IP matches your computer:", error);
+      console.error("Connection Error!", error);
     } finally {
       setLoading(false);
     }
+    */
+
+    // Just update the timeStep visually for now
+    setTimeStep(step);
   };
 
   const onSliderChange = (value: number) => {
     const roundedValue = Math.floor(value);
     setTimeStep(roundedValue);
+    // Logic to simulate a "loading" state flick when sliding
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => fetchSimulationData(roundedValue), 100);
   };
 
   useEffect(() => {
-    fetchSimulationData(0);
+    // fetchSimulationData(0); // Commented out
   }, []);
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#FF4500', fontSize: 16 }}>Map feature is not available on web.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -61,10 +89,10 @@ export default function UserLocationMap() {
         {/* Render the Spread Zones */}
         {simulationData?.hotspots?.map((spot: any) => (
           <Circle
-            key={`hotspot-${spot.id}-${timeStep}`}
+            key={`hotspot-${spot.id}`}
             center={{ latitude: spot.lat, longitude: spot.lng }}
             radius={spot.radius}
-            fillColor="rgba(255, 69, 0, 0.4)" // Slightly more visible
+            fillColor="rgba(255, 69, 0, 0.3)"
             strokeColor="#FF4500"
             strokeWidth={2}
           />
@@ -73,10 +101,10 @@ export default function UserLocationMap() {
         {/* Render the Individual Mosquitos */}
         {simulationData?.agents?.map((agent: any) => (
           <Marker
-            key={`agent-${agent.id}-${timeStep}`}
+            key={`agent-${agent.id}`}
             coordinate={{ latitude: agent.lat, longitude: agent.lng }}
             anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false} // Performance boost
+            tracksViewChanges={false}
           >
             <Image
               source={require('../../../assets/images/mosquito.png')}
@@ -87,15 +115,10 @@ export default function UserLocationMap() {
       </MapView>
 
       <View style={styles.controlPanel}>
-        <Text style={styles.locationTag}>Villa Arevalo District</Text>
-
-        {/* Connection Status Helper */}
-        {simulationData.agents.length === 0 && !loading && (
-          <Text style={{ color: '#ff4444', fontSize: 10 }}>No agents found - check backend connection</Text>
-        )}
+        <Text style={styles.locationTag}>VILLA AREVALO DISTRICT</Text>
 
         <View style={styles.headerRow}>
-          <Text style={styles.timeLabel}>T + {timeStep} Hours</Text>
+          <Text style={styles.timeLabel}>T + {timeStep} HOURS</Text>
           {loading && <ActivityIndicator size="small" color="#FF4500" style={{ marginLeft: 10 }} />}
         </View>
 
