@@ -1,527 +1,361 @@
-import CapturePreview from "@/components/features/capture/CapturePreview";
-import { BlurView } from "expo-blur";
 import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
+import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
-import {
-  Aperture,
-  Camera,
-  CheckCircle,
-  Droplets,
-  Image as ImageIcon,
-  Info,
-  ScanSearch,
-  ShieldCheck,
-  Sparkles,
-  X,
-} from "lucide-react-native";
-import React, { useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ArrowLeft, ArrowRight, Camera, Check, Image as ImageIcon, Plus } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import { Dimensions, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const { width } = Dimensions.get("window");
-
-interface ImageMetadata {
-  timestamp: string;
-  location: string;
-}
+const { width, height } = Dimensions.get("window");
 
 export default function CaptureScreen() {
   const router = useRouter();
-  const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [metadata, setMetadata] = useState<ImageMetadata | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [showSnackbar, setShowSnackbar] = useState(false);
-  const [isSourceModalVisible, setIsSourceModalVisible] = useState(false);
-  const snackbarAnim = useRef(new Animated.Value(0)).current;
+  const [viewMode, setViewMode] = useState<"main" | "success">("main");
+  const [recentPhotos, setRecentPhotos] = useState<string[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const triggerSnackbar = () => {
-    setShowSnackbar(true);
-    Animated.sequence([
-      Animated.timing(snackbarAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.delay(2000),
-      Animated.timing(snackbarAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setShowSnackbar(false));
-  };
-
-  const getGeotag = async () => {
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Denied", "Location access is needed for geotagging.");
-        return "Unknown Location";
+  useEffect(() => {
+    (async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === "granted") {
+        const media = await MediaLibrary.getAssetsAsync({
+          first: 4,
+          mediaType: ["photo"],
+          sortBy: ["creationTime"],
+        });
+        setRecentPhotos(media.assets.map((asset) => asset.uri));
       }
+    })();
+  }, []);
 
-      const userLocation = await Location.getCurrentPositionAsync({});
-      const reverseGeocode = await Location.reverseGeocodeAsync({
-        latitude: userLocation.coords.latitude,
-        longitude: userLocation.coords.longitude,
-      });
+  const openGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      alert("Sorry, we need camera roll permissions to make this work!");
+      return;
+    }
 
-      if (reverseGeocode.length > 0) {
-        const item = reverseGeocode[0];
-        const barangay = item.name || item.street || "";
-        const district = item.district || item.subregion || "";
-        const city = item.city || "";
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+    });
 
-        return [barangay, district, city].filter(Boolean).join(", ");
-      }
-      return "Unknown Location";
-    } catch (error) {
-      console.error(error);
-      return "Location Error";
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+      setViewMode("success");
     }
   };
 
-  const pickImage = async (useCamera: boolean) => {
-    try {
-      setLoading(true);
+  const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      alert("Sorry, we need camera permissions to make this work!");
+      return;
+    }
 
-      const permissionResult = useCamera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 1,
+    });
 
-      if (permissionResult.granted === false) {
-        Alert.alert("Permission Denied", `You need to allow ${useCamera ? "camera" : "gallery"} access.`);
-        setLoading(false);
-        return;
-      }
-
-      const result = useCamera
-        ? await ImagePicker.launchCameraAsync({
-          allowsEditing: false,
-          quality: 1,
-        })
-        : await ImagePicker.launchImageLibraryAsync({
-          allowsEditing: false,
-          quality: 1,
-        });
-
-      if (!result.canceled) {
-        setImage(result.assets[0].uri);
-        const timestamp = new Date().toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        });
-        const locationStr = await getGeotag();
-        setMetadata({ timestamp, location: locationStr });
-        triggerSnackbar();
-        setIsSourceModalVisible(false);
-      }
-    } catch (error) {
-      Alert.alert("Error", "Something went wrong while picking the image.");
-    } finally {
-      setLoading(false);
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+      setViewMode("success");
     }
   };
-
-  const handleAnalyze = async () => {
-    setAnalyzing(true);
-    setTimeout(() => {
-      setAnalyzing(false);
-      Alert.alert("Analysis Complete", "Your image has been successfully processed by our AI models.", [
-        { text: "View Results", onPress: () => router.push("/reports") },
-      ]);
-    }, 2000);
-  };
-
-  const resetCapture = () => {
-    setImage(null);
-    setMetadata(null);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Fetching metadata...</Text>
-      </View>
-    );
-  }
 
   return (
-    <View style={styles.container}>
-      {!image ? (
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity
-            style={styles.mainActionCard}
-            onPress={() => setIsSourceModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.mainIconCircle}>
-              <View style={styles.iconStack}>
-                <Aperture color="white" size={32} strokeWidth={1.5} />
-                <View style={styles.sparkleOverlay}>
-                  <Sparkles color="white" size={13} fill="white" />
-                </View>
-              </View>
-            </View>
-            <Text style={styles.uploadTitle}>Upload Image</Text>
-            <Text style={styles.uploadSubtitle}>stagnant water should be visible if possible</Text>
-          </TouchableOpacity>
-
-          <View style={styles.guidelinesSection}>
-            <View style={styles.sectionHeader}>
-              <Info size={20} color="#4F46E5" />
-              <Text style={styles.sectionTitle}>Submission Guidelines</Text>
-            </View>
-
-            <View style={styles.guidelineCard}>
-              <View style={[styles.guideIconBg, { backgroundColor: '#EEF2FF' }]}>
-                <Droplets size={22} color="#4F46E5" />
-              </View>
-              <View style={styles.guideTextWrapper}>
-                <Text style={styles.guideTitle}>Clear Visibility</Text>
-                <Text style={styles.guideDesc}>Ensure stagnant water or potential breeding spots are centered and clear.</Text>
-              </View>
-            </View>
-
-            <View style={styles.guidelineCard}>
-              <View style={[styles.guideIconBg, { backgroundColor: '#F5F3FF' }]}>
-                <ScanSearch size={22} color="#7C3AED" />
-              </View>
-              <View style={styles.guideTextWrapper}>
-                <Text style={styles.guideTitle}>AI Processing</Text>
-                <Text style={styles.guideDesc}>Our models work best with natural lighting and unblurred captures.</Text>
-              </View>
-            </View>
-
-            <View style={styles.guidelineCard}>
-              <View style={[styles.guideIconBg, { backgroundColor: '#F0FDF4' }]}>
-                <ShieldCheck size={22} color="#10B981" />
-              </View>
-              <View style={styles.guideTextWrapper}>
-                <Text style={styles.guideTitle}>Verification</Text>
-                <Text style={styles.guideDesc}>Every report is automatically geotagged to help local health units respond faster.</Text>
-              </View>
-            </View>
+    <SafeAreaView style={[styles.mainContainer, viewMode === "success" && styles.mainContainerSuccess]}>
+      <View style={{ paddingHorizontal: 24, zIndex: 1, elevation: 1, paddingTop: 40 }}>
+        {/* Upload Card */}
+        <TouchableOpacity style={[styles.uploadCard, viewMode === "success" && styles.uploadCardDimmed]} onPress={openGallery}>
+          <View style={[styles.dashedCircle, viewMode === "success" && styles.dashedCircleDimmed]}>
+            <Plus color={viewMode === "success" ? "#C7D2FE" : "#4F46E5"} size={28} strokeWidth={3} />
           </View>
+          <Text style={[styles.uploadCardTitle, viewMode === "success" && styles.textDimmed]}>
+            Upload a Document
+          </Text>
+          <Text style={[styles.uploadCardSubtitle, viewMode === "success" && styles.textDimmed]}>
+            You can upload a document by importing or scanning with your camera
+          </Text>
+        </TouchableOpacity>
 
-          {showSnackbar && (
-            <Animated.View
-              style={[
-                styles.snackbar,
-                {
-                  transform: [
-                    {
-                      translateY: snackbarAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [100, 0],
-                      }),
-                    },
-                  ],
-                  opacity: snackbarAnim,
-                },
-              ]}
-            >
-              <CheckCircle color="white" size={20} />
-              <Text style={styles.snackbarText}>File added successfully!</Text>
-            </Animated.View>
+        {/* Buttons Row */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, viewMode === "success" && styles.actionBtnDimmed]}
+            onPress={openGallery}
+          >
+            <ImageIcon color={viewMode === "success" ? "#C7D2FE" : "#4F46E5"} size={20} />
+            <Text style={[styles.actionBtnText, viewMode === "success" && styles.textDimmed]}>Gallery</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, viewMode === "success" && styles.actionBtnDimmed]}
+            onPress={openCamera}
+          >
+            <Camera color={viewMode === "success" ? "#C7D2FE" : "#4F46E5"} size={20} />
+            <Text style={[styles.actionBtnText, viewMode === "success" && styles.textDimmed]}>Camera</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Recent Files */}
+        <Text style={[styles.recentFilesTitle, viewMode === "success" && { opacity: 0.3 }]}>Your Recent Files</Text>
+        <View style={styles.gridContainer}>
+          {recentPhotos.length > 0 ? (
+            recentPhotos.map((url, i) => (
+              <Image
+                key={i}
+                source={{ uri: url }}
+                style={[styles.gridImage, viewMode === "success" && { opacity: 0.3 }]}
+              />
+            ))
+          ) : (
+            <Text style={{ color: "#94A3B8", marginTop: 20 }}>No recent photos found.</Text>
           )}
-        </ScrollView>
-      ) : (
-        <CapturePreview
-          image={image}
-          metadata={metadata}
-          onReset={resetCapture}
-          onAnalyze={handleAnalyze}
-          analyzing={analyzing}
-        />
+        </View>
+      </View>
+
+      {/* Share Button Floating */}
+      {viewMode === "main" && (
+        <View style={styles.floatingButtonContainer}>
+          <TouchableOpacity style={styles.shareButton} onPress={() => { }}>
+            <ArrowRight color="#FFFFFF" size={18} />
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isSourceModalVisible}
-        onRequestClose={() => setIsSourceModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsSourceModalVisible(false)}
-        >
-          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Submit Evidence</Text>
-                <Text style={styles.modalSubtitle}>Choose a source for your image</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setIsSourceModalVisible(false)}
-              >
-                <X color="#64748B" size={20} />
-              </TouchableOpacity>
+      {/* Success Modal overlay (Right screen) */}
+      {viewMode === "success" && (
+        <View style={styles.bottomSheetContainer}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.successCircle}>
+              <Check color="#FFFFFF" size={32} strokeWidth={3} />
             </View>
+            <Text style={styles.successTitle}>Upload Complete</Text>
+            <Text style={styles.successSubtitle}>
+              All selected files have been sucessfully Uploaded
+            </Text>
 
-            <View style={styles.modalOptions}>
-              <TouchableOpacity
-                style={styles.optionItem}
-                onPress={() => pickImage(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIconBg, { backgroundColor: '#EEF2FF' }]}>
-                  <Camera color="#4F46E5" size={24} />
-                </View>
-                <View style={styles.optionTextContent}>
-                  <Text style={styles.optionTitle}>Take Photo</Text>
-                  <Text style={styles.optionDesc}>Capture evidence in real-time</Text>
-                </View>
-              </TouchableOpacity>
+            <View style={{ flex: 1 }} />
 
-              <TouchableOpacity
-                style={[styles.optionItem, { marginTop: 12 }]}
-                onPress={() => pickImage(false)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIconBg, { backgroundColor: '#F5F3FF' }]}>
-                  <ImageIcon color="#7C3AED" size={24} />
-                </View>
-                <View style={styles.optionTextContent}>
-                  <Text style={styles.optionTitle}>Upload from Gallery</Text>
-                  <Text style={styles.optionDesc}>Choose an existing file</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.uploadMoreText}>Want to upload more files?</Text>
+
+            <TouchableOpacity style={styles.backButton} onPress={() => { setViewMode("main"); setSelectedImage(null); }}>
+              <ArrowLeft color="#FFFFFF" size={18} />
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </Modal>
-    </View>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
     backgroundColor: "#F8FAFC",
   },
-  scrollContent: {
-    padding: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
+  mainContainerSuccess: {
+    backgroundColor: "#A5B4FC", // Indigo 300 to match success theme background
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "white",
-  },
-  loadingText: {
-    marginTop: 12,
-    color: "#6B7280",
-    fontFamily: "Inter_500Medium",
-  },
-  mainActionCard: {
-    backgroundColor: "white",
+  uploadCard: {
+    backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 24,
+    padding: 32,
     alignItems: "center",
+    marginBottom: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
-    elevation: 4,
-    marginBottom: 32,
+    elevation: 3,
   },
-  mainIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#4F46E5",
+  uploadCardDimmed: {
+    backgroundColor: "transparent",
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  dashedCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: "#4F46E5", // Indigo 600
+    borderStyle: "dashed",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
   },
-  iconStack: {
-    position: "relative",
+  dashedCircleDimmed: {
+    backgroundColor: "transparent",
+    borderColor: "#818CF8", // Indigo 400
   },
-  sparkleOverlay: {
-    position: "absolute",
-    top: -6,
-    right: -8,
-  },
-  uploadTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: "#4F46E5",
-    marginBottom: 4,
-  },
-  uploadSubtitle: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#64748B",
-    textAlign: "center",
-  },
-  guidelinesSection: {
-    marginTop: 8,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    gap: 10,
-  },
-  sectionTitle: {
+  uploadCardTitle: {
     fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "700",
     color: "#1E293B",
+    marginBottom: 8,
   },
-  guidelineCard: {
+  uploadCardSubtitle: {
+    fontSize: 13,
+    color: "#94A3B8",
+    textAlign: "center",
+    lineHeight: 18,
+    paddingHorizontal: 10,
+  },
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 32,
+    gap: 16,
+  },
+  actionBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-  },
-  guideIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
     justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  guideTextWrapper: {
-    flex: 1,
-    marginLeft: 16,
+  actionBtnDimmed: {
+    backgroundColor: "transparent",
+    elevation: 0,
+    shadowOpacity: 0,
+    opacity: 0.5,
   },
-  guideTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: "#1E293B",
-    marginBottom: 2,
+  actionBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#94A3B8",
   },
-  guideDesc: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#64748B",
-    lineHeight: 18,
+  textDimmed: {
+    color: "#4F46E5", // Stronger text color inside the button/headers
   },
-  snackbar: {
+  recentFilesTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+    marginBottom: 16,
+  },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  gridImage: {
+    width: (width - 48 - 12) / 2, // 2 columns
+    height: (width - 48 - 16) / 2 * 0.7, // Rectangular shapes
+    borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: "#E2E8F0",
+  },
+  floatingButtonContainer: {
     position: "absolute",
     bottom: 40,
-    left: 20,
-    right: 20,
-    backgroundColor: "#10B981",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 10,
+    elevation: 10,
+  },
+  shareButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
+    backgroundColor: "#4F46E5", // Indigo 600
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 30,
+    gap: 8,
+    shadowColor: "#4F46E5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  snackbarText: {
-    color: "white",
-    fontFamily: "Inter_600SemiBold",
-    marginLeft: 10,
-    fontSize: 14,
+  shareButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+  bottomSheetContainer: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: "flex-end",
+    zIndex: 20,
+    elevation: 20,
   },
-  modalContent: {
-    backgroundColor: 'white',
+  bottomSheet: {
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    padding: 24,
-    paddingBottom: 40,
+    padding: 40,
+    alignItems: "center",
+    height: height * 0.45,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 20,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  successCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#4F46E5", // Indigo 600
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 24,
+    shadowColor: "#4F46E5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  modalTitle: {
+  successTitle: {
     fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontWeight: "700",
     color: "#1E293B",
+    marginBottom: 12,
   },
-  modalSubtitle: {
+  successSubtitle: {
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "#64748B",
-    marginTop: 2,
+    color: "#94A3B8",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+    paddingHorizontal: 20,
   },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
+  uploadMoreText: {
+    fontSize: 14,
+    color: "#94A3B8",
+    fontWeight: "500",
+    marginBottom: 16,
   },
-  modalOptions: {
-    gap: 4,
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4F46E5", // Indigo 600
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 30,
+    gap: 8,
+    shadowColor: "#4F46E5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  optionIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionTextContent: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  optionTitle: {
+  backButtonText: {
+    color: "#FFFFFF",
     fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: "#1E293B",
-  },
-  optionDesc: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#64748B",
+    fontWeight: "600",
   },
 });
