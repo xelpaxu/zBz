@@ -1,10 +1,10 @@
-import UserLocationMap from "@/components/features/map/Map";
+import MapComponent from "@/components/features/map/Map";
 import { StyleSheet, View } from "react-native";
 
 export default function MapScreen() {
   return (
     <View style={styles.container}>
-      <UserLocationMap />
+      <MapComponent />
     </View>
   );
 }
