@@ -4,7 +4,7 @@
     "slug": "moskito",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/joeross.jpg",
+    "icon": "./assets/images/Aedex.png",
     "scheme": "moskito",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -12,25 +12,32 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_MEDIA_LOCATION",
+        "READ_MEDIA_AUDIO"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/joeross.jpg",
-        "backgroundImage": "./assets/images/joeross.jpg",
-        "monochromeImage": "./assets/images/joeross.jpg"
+        "foregroundImage": "./assets/images/Aedex.png",
+        "backgroundImage": "./assets/images/Aedex.png",
+        "monochromeImage": "./assets/images/Aedex.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.xelpaxu.moskito"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/joeross.jpg"
+      "favicon": "./assets/images/Aedex.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/joeross.jpg",
+          "image": "./assets/images/Aedex.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -39,9 +46,19 @@
           }
         }
       ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow AEDEX to access your photos to detect mosquito breeding sites.",
+          "savePhotosPermission": true,
+          "isAccessMediaLocationEnabled": true,
+          "isAudioLibraryEnabled": true
+        }
+      ],
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
