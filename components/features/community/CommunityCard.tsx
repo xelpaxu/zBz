@@ -1,8 +1,17 @@
-import { MapPin, MessageCircle, Share2, ThumbsUp } from "lucide-react-native";
-import React from "react";
 import {
+  Clock,
+  ExternalLink,
+  MapPin,
+  MessageCircle,
+  Share2,
+  ThumbsUp,
+} from "lucide-react-native";
+import React, { useRef } from "react";
+import {
+  Animated,
   Dimensions,
   Image,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +19,52 @@ import {
 } from "react-native";
 
 const { width } = Dimensions.get("window");
+
+const C = {
+  bg: "#0B0E14",
+  surface: "#111520",
+  surfaceRaised: "#161C2D",
+  surfaceHigh: "#1C2438",
+  border: "#1E2640",
+  borderBright: "#2A3554",
+  text: "#E8EDF8",
+  textSub: "#697A9B",
+  textDim: "#3C4A66",
+  accent: "#4F8EF7",
+  danger: "#FF4D6A",
+  dangerGlow: "#FF4D6A18",
+  dangerMid: "#FF4D6A45",
+  safe: "#00C896",
+  safeGlow: "#00C89618",
+  safeMid: "#00C89645",
+  warn: "#F5A623",
+  warnGlow: "#F5A62318",
+  warnMid: "#F5A62345",
+};
+
+const badgeCfg = (status: string) => {
+  if (status === "CRITICAL")
+    return { color: C.danger, glow: C.dangerGlow, mid: C.dangerMid };
+  if (status === "LOW RISK" || status === "VERIFIED")
+    return { color: C.safe, glow: C.safeGlow, mid: C.safeMid };
+  return { color: C.warn, glow: C.warnGlow, mid: C.warnMid };
+};
+
+const SocialBtn = ({ icon: Icon, label }: { icon: any; label: string }) => (
+  <TouchableOpacity style={sb.btn} activeOpacity={0.65}>
+    <Icon color={C.textDim} size={13} strokeWidth={2} />
+    <Text style={sb.text}>{label}</Text>
+  </TouchableOpacity>
+);
+const sb = StyleSheet.create({
+  btn: { flexDirection: "row", alignItems: "center", gap: 5 },
+  text: {
+    fontSize: 11,
+    color: C.textDim,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+});
 
 export default function PostCard({
   image,
@@ -21,142 +76,205 @@ export default function PostCard({
   isFullWidth,
   onPress,
 }: any) {
-  const cardWidth = isFullWidth ? width - 24 : (width - 50) / 2;
+  const cardWidth = isFullWidth ? width - 32 : (width - 52) / 2;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () =>
+    Animated.spring(scale, {
+      toValue: 0.975,
+      useNativeDriver: true,
+      tension: 140,
+      friction: 12,
+    }).start();
+  const pressOut = () =>
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 140,
+      friction: 12,
+    }).start();
+
+  const imgSrc = typeof image === "string" ? { uri: image } : image;
+  const avatarSrc =
+    typeof userAvatar === "string" ? { uri: userAvatar } : userAvatar;
+  const badge = badgeCfg(status);
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.9}
-      style={[styles.card, { width: cardWidth }]}
+    <Animated.View
+      style={[styles.card, { width: cardWidth, transform: [{ scale }] }]}
     >
-      <View style={styles.userHeader}>
-        <Image source={userAvatar} style={styles.avatar} />
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{userName}</Text>
-          <View style={styles.locRow}>
-            <Text style={styles.timeText}>{timestamp}</Text>
-            <Text style={styles.dotSeparator}> • </Text>
-            <MapPin size={10} color="#65676B" />
-            <Text style={styles.locText} numberOfLines={1}>{location}</Text>
+      <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
+        {/* IMAGE — clean, no text overlay */}
+        <View style={styles.imgWrap}>
+          <Image source={imgSrc} style={styles.img} resizeMode="cover" />
+
+          {/* Status pill — top left */}
+          <View
+            style={[
+              styles.pill,
+              { backgroundColor: C.bg + "DD", borderColor: badge.mid },
+            ]}
+          >
+            <View
+              style={[
+                styles.pillDot,
+                { backgroundColor: badge.color, shadowColor: badge.color },
+              ]}
+            />
+            <Text style={[styles.pillText, { color: badge.color }]}>
+              {status}
+            </Text>
+          </View>
+
+          {/* Timestamp — top right */}
+          <View style={styles.tsChip}>
+            <Clock color={C.textSub} size={9} strokeWidth={2.5} />
+            <Text style={styles.tsText}>{timestamp}</Text>
           </View>
         </View>
-        <View
-          style={status === "CRITICAL" ? styles.criticalBadge : styles.warningBadge}
-        >
-          <Text style={styles.badgeText}>{status}</Text>
+
+        {/* META ROW — avatar + name + location + view cta */}
+        <View style={styles.meta}>
+          <Image source={avatarSrc} style={styles.avatar} />
+          <View style={styles.metaBody}>
+            <Text style={styles.userName} numberOfLines={1}>
+              {userName}
+            </Text>
+            <View style={styles.locRow}>
+              <MapPin color={C.accent} size={9} strokeWidth={2.5} />
+              <Text style={styles.locText} numberOfLines={1}>
+                {location}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={onPress}
+            style={styles.viewBtn}
+            activeOpacity={0.8}
+          >
+            <ExternalLink color={C.bg} size={12} strokeWidth={2.5} />
+          </TouchableOpacity>
         </View>
-      </View>
 
-      <Image source={image} style={styles.mainImage} />
-
-      <View style={styles.socialBar}>
-        <TouchableOpacity style={styles.socialAction}>
-          <ThumbsUp size={18} color="#65676B" />
-          <Text style={styles.socialText}>Helpful</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialAction}>
-          <MessageCircle size={18} color="#65676B" />
-          <Text style={styles.socialText}>Comment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialAction}>
-          <Share2 size={18} color="#65676B" />
-          <Text style={styles.socialText}>Share</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+        {/* SOCIAL BAR — sits on slightly raised bg so it reads as a footer */}
+        <View style={styles.socialBar}>
+          <SocialBtn icon={ThumbsUp} label="Helpful" />
+          <View style={styles.dot} />
+          <SocialBtn icon={MessageCircle} label="Comment" />
+          <View style={styles.dot} />
+          <SocialBtn icon={Share2} label="Share" />
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    marginBottom: 15,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    marginBottom: 12,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  userHeader: {
+
+  imgWrap: {
+    width: "100%",
+    height: 200,
+    backgroundColor: C.surfaceRaised,
+    position: "relative",
+  },
+  img: { width: "100%", height: "100%" },
+
+  pill: {
+    position: "absolute",
+    top: 10,
+    left: 10,
     flexDirection: "row",
-    padding: 12,
     alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  pillDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  pillText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.9 },
+
+  tsChip: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.bg + "DD",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  tsText: { fontSize: 10, color: C.textSub, fontWeight: "600" },
+
+  meta: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: C.border,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: C.surfaceRaised,
     borderWidth: 1,
-    borderColor: "#F0F2F5",
+    borderColor: C.borderBright,
   },
-  userInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1C1E21",
-    fontFamily: "Manrope_700Bold",
-  },
-  locRow: {
-    flexDirection: "row",
+  metaBody: { flex: 1, gap: 4 },
+  userName: { fontSize: 13, fontWeight: "800", color: C.text },
+  locRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  locText: { fontSize: 10, color: C.textSub, fontWeight: "500", flex: 1 },
+
+  viewBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: C.accent,
     alignItems: "center",
-    marginTop: 2,
+    justifyContent: "center",
+    shadowColor: C.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 5,
   },
-  timeText: {
-    fontSize: 11,
-    color: "#65676B",
-  },
-  dotSeparator: {
-    fontSize: 11,
-    color: "#65676B",
-  },
-  locText: {
-    fontSize: 11,
-    color: "#65676B",
-    marginLeft: 2,
-    flex: 1,
-  },
-  criticalBadge: {
-    backgroundColor: "#FF5A5F",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  warningBadge: {
-    backgroundColor: "#FACC15",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  badgeText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  mainImage: {
-    width: "100%",
-    height: 240,
-    backgroundColor: "#F0F2F5",
-  },
+
   socialBar: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F0F2F5",
-  },
-  socialAction: {
-    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    paddingVertical: 11,
+    backgroundColor: C.surfaceRaised,
   },
-  socialText: {
-    marginLeft: 6,
-    fontSize: 13,
-    color: "#65676B",
-    fontWeight: "600",
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: C.borderBright,
   },
 });
